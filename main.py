@@ -147,7 +147,7 @@ def is_time_between(begin_time, end_time, check_time=None):
         return check_time >= begin_time or check_time <= end_time
 
 def input_text_box(box_id, text, currentDriver):
-    box = currentDriver.find_element_by_id(box_id)
+    box = currentDriver.find_element(By.ID, box_id)
     for charachter in text:
         box.send_keys(charachter)
         time.sleep(random.randint(1, 5) / 100)
@@ -199,8 +199,8 @@ def scan_for_preferred_tests(before_date, after_date, unavailable_dates, test_da
 
     print("After: " + str(maxDate))
 
-    available_calendar = currentDriver.find_element_by_class_name("BookingCalendar-datesBody")
-    available_days = available_calendar.find_elements_by_xpath(".//td")
+    available_calendar = currentDriver.find_element(By.CLASS_NAME, "BookingCalendar-datesBody")
+    available_days = available_calendar.find_elements(By.XPATH, ".//td")
 
     found = False
 
@@ -209,7 +209,7 @@ def scan_for_preferred_tests(before_date, after_date, unavailable_dates, test_da
 
     for day in available_days:
         if not "--unavailable" in day.get_attribute("class"):
-            day_a = day.find_element_by_xpath(".//a")
+            day_a = day.find_element(By.XPATH, ".//a")
             if day_a.get_attribute("data-date") not in unavailable_dates and datetime.strptime(day_a.get_attribute("data-date"), "%Y-%m-%d") < minDate and \
                 datetime.strptime(day_a.get_attribute("data-date"), "%Y-%m-%d") > maxDate and datetime.strptime(day_a.get_attribute("data-date"), "%Y-%m-%d").weekday() < 5 and \
                     day_a.get_attribute("data-date") != formatted_test_date:
@@ -224,29 +224,29 @@ def solve_captcha(currentDriver,skip=False) -> bool:
     if not skip:
         driver = currentDriver
         driver.switch_to.default_content()
-        iframe = driver.find_element_by_id("main-iframe")
+        iframe = driver.find_element(By.ID, "main-iframe")
         driver.switch_to.frame(iframe)
-        iframe1 = driver.find_element_by_css_selector("iframe[name*='a-'][src*='https://www.google.com/recaptcha/api2/anchor?']")
+        iframe1 = driver.find_element(By.CSS_SELECTOR, "iframe[name*='a-'][src*='https://www.google.com/recaptcha/api2/anchor?']")
         driver.switch_to.frame(iframe1)
         time.sleep(0.2)
-        driver.find_element_by_xpath("//span[@id='recaptcha-anchor']").click()
+        driver.find_element(By.XPATH, "//span[@id='recaptcha-anchor']").click()
         driver.switch_to.default_content()
         time.sleep(0.2)
-        iframe = driver.find_element_by_id("main-iframe")
+        iframe = driver.find_element(By.ID, "main-iframe")
         driver.switch_to.frame(iframe)
         if "Why am I seeing this page" in driver.page_source:
             print("Completing captcha 1")
             time.sleep(2)
-            iframe1 = driver.find_element_by_css_selector("iframe[title*='recaptcha challenge'][src*='https://www.google.com/recaptcha/api2/bframe?']")
+            iframe1 = driver.find_element(By.CSS_SELECTOR, "iframe[title*='recaptcha challenge'][src*='https://www.google.com/recaptcha/api2/bframe?']")
             driver.switch_to.frame(iframe1)
             print("Completing captcha 2")
             time.sleep(2)
-            driver.find_elements_by_class_name("help-button-holder")[0].click()
+            driver.find_elements(By.CLASS_NAME, "help-button-holder")[0].click()
             random_sleep(5, 4)
             attempts2 = 0
             while ("Multiple correct solutions required" in driver.page_source and attempts2 < 4):
                 attempts2 += 1
-                driver.find_elements_by_class_name("help-button-holder")[0].click()
+                driver.find_elements(By.CLASS_NAME, "help-button-holder")[0].click()
                 random_sleep(5, 4)
             driver.switch_to.default_content()
             print("Completing captcha 3")
@@ -264,7 +264,7 @@ def enter_credentials(manual=False):
         input_text_box("driving-licence-number", str(licenceInfo["licence"]), driver)
         input_text_box("application-reference-number", str(licenceInfo["booking"]), driver)
         random_sleep(1, 1)
-        driver.find_element_by_id("booking-login").click()
+        driver.find_element(By.ID, "booking-login").click()
         random_sleep(3, 1)
     else:
         print(f"Enter credentials manually...")
@@ -473,14 +473,14 @@ for i in range(max_attempt):
                             else:
                                 random_sleep(3, 1)
 
-                                contents_container = driver.find_elements_by_class_name("contents")
-                                # contents_container = driver.find_element_by_css_selector("div.contents")
-                                test_date_temp = contents_container[0].find_element_by_xpath(".//dd").get_attribute('innerHTML')
-                                test_center_temp = contents_container[1].find_element_by_xpath(".//dd").get_attribute('innerHTML')
+                                contents_container = driver.find_elements(By.CLASS_NAME, "contents")
+                                # contents_container = driver.find_element(By.CSS_SELECTOR, "div.contents")
+                                test_date_temp = contents_container[0].find_element(By.XPATH, ".//dd").get_attribute('innerHTML')
+                                test_center_temp = contents_container[1].find_element(By.XPATH, ".//dd").get_attribute('innerHTML')
                                 print("Test Date: " + test_date_temp)
                                 print("Test Center: " + test_center_temp)
 
-                                if ("Your booking has been cancelled. You’ll need to either re-book your test or call the " in driver.find_element_by_id("main").get_attribute('innerHTML')):
+                                if ("Your booking has been cancelled. You’ll need to either re-book your test or call the " in driver.find_element(By.ID, "main").get_attribute('innerHTML')):
                                     print("Test has been cancelled")
                                     licenceInfo["active"] = False
                                 else:
@@ -489,15 +489,15 @@ for i in range(max_attempt):
                                         "center": test_center_temp
                                     });
 
-                                if ("The number of allowed changes to your booking has now been exceeded" in driver.find_element_by_id("main").get_attribute('innerHTML')):
+                                if ("The number of allowed changes to your booking has now been exceeded" in driver.find_element(By.ID, "main").get_attribute('innerHTML')):
                                     print("Maximum number of rebookings has been exceeded")
 
                                 if "Yes" in licenceInfo["current-test"]["date"]:
                                     print("Reserved test login")
-                                    driver.find_element_by_id("date-time-change").click()
+                                    driver.find_element(By.ID, "date-time-change").click()
                                     random_sleep(1, 2)
 
-                                    driver.find_element_by_id("test-choice-earliest").click()
+                                    driver.find_element(By.ID, "test-choice-earliest").click()
 
                                     random_sleep(1, 2)
 
@@ -505,24 +505,24 @@ for i in range(max_attempt):
 
                                     random_sleep(1, 2)
 
-                                    driver.find_element_by_id("driving-licence-submit").click()
+                                    driver.find_element(By.ID, "driving-licence-submit").click()
 
                                     licenceInfo["centre"] = [test_center_temp]
 
                                     random_sleep(1, 2)
                                 else:
-                                    driver.find_element_by_id("test-centre-change").click()
+                                    driver.find_element(By.ID, "test-centre-change").click()
                                     random_sleep(3, 2)
 
-                                    driver.find_element_by_id("test-centres-input").clear()
+                                    driver.find_element(By.ID, "test-centres-input").clear()
                                     input_text_box("test-centres-input", str(licenceInfo["center"][0]), driver)
 
-                                    driver.find_element_by_id("test-centres-submit").click()
+                                    driver.find_element(By.ID, "test-centres-submit").click()
                                     random_sleep(5, 2)
 
-                                    results_container = driver.find_element_by_class_name("test-centre-results")
+                                    results_container = driver.find_element(By.CLASS_NAME, "test-centre-results")
 
-                                    test_center = results_container.find_element_by_xpath(".//a")
+                                    test_center = results_container.find_element(By.XPATH, ".//a")
 
                                     licenceInfo["refresh_url"] = test_center.get_attribute('href')
 
@@ -560,28 +560,28 @@ for i in range(max_attempt):
                                     if found:
                                         month = datetime.strptime(last_date, "%Y-%m-%d")
                                         attempts = 0
-                                        while month.strftime("%B") != driver.find_element_by_class_name("BookingCalendar-currentMonth").get_attribute('innerHTML') and attempts < 12:
+                                        while month.strftime("%B") != driver.find_element(By.CLASS_NAME, "BookingCalendar-currentMonth").get_attribute('innerHTML') and attempts < 12:
                                             try:
-                                                driver.find_element_by_class_name("BookingCalendar-nav--prev").click()
+                                                driver.find_element(By.CLASS_NAME, "BookingCalendar-nav--prev").click()
                                             except:
                                                 print("Booking rev fail")
                                             attempts += 1
                                             random_sleep(0.1, 0.2)
                                         print(last_date)
                                         print("TARGET CAL MONTH: " + month.strftime("%B"))
-                                        print("CURRENT CAL MONTH: " + driver.find_element_by_class_name("BookingCalendar-currentMonth").get_attribute('innerHTML'))
+                                        print("CURRENT CAL MONTH: " + driver.find_element(By.CLASS_NAME, "BookingCalendar-currentMonth").get_attribute('innerHTML'))
                                         print("REVERSE NUM: " + str(attempts))
                                         # time.sleep(0.6)
                                         last_date_element.click()
-                                        time_container = driver.find_element_by_id("date-" + last_date)
-                                        time_item = int(time_container.find_element_by_xpath(".//label").get_attribute('for').replace("slot-", "")) / 1000
+                                        time_container = driver.find_element(By.ID, "date-" + last_date)
+                                        time_item = int(time_container.find_element(By.XPATH, ".//label").get_attribute('for').replace("slot-", "")) / 1000
                                         test_time = datetime.fromtimestamp(time_item).strftime("%H:%M")
 
                                         # Notify my phone
                                         test_avaliable(last_date,test_time)
 
                                         try:
-                                            shortNoticeCheck = time_container.find_element_by_id(time_container.find_element_by_xpath(".//label").get_attribute('for')).get_attribute('data-short-notice')
+                                            shortNoticeCheck = time_container.find_element(By.ID, time_container.find_element(By.XPATH, ".//label").get_attribute('for')).get_attribute('data-short-notice')
                                             if shortNoticeCheck == "true":
                                                 shortNotice = True
                                                 print("Short notice")
@@ -592,7 +592,7 @@ for i in range(max_attempt):
 
                                         print("Test Found: " + last_date + " at " + test_time)
 
-                                        time_container.find_element_by_xpath(".//label").click()
+                                        time_container.find_element(By.XPATH, ".//label").click()
 
                                         booking_failed = False
                                         errorPoint = "p0"
@@ -602,13 +602,13 @@ for i in range(max_attempt):
                                             time_container.click()
                                             errorPoint = "p1"
                                             time.sleep(0.1)
-                                            driver.find_element_by_id("slot-chosen-submit").click()
+                                            driver.find_element(By.ID, "slot-chosen-submit").click()
                                             errorPoint = "p2"
                                             time.sleep(0.4)
                                             if shortNotice:
-                                                driver.find_element_by_xpath("(//button[@id='slot-warning-continue'])[2]").click()
+                                                driver.find_element(By.XPATH, "(//button[@id='slot-warning-continue'])[2]").click()
                                             else:
-                                                driver.find_element_by_id("slot-warning-continue").click()
+                                                driver.find_element(By.ID, "slot-warning-continue").click()
                                             errorPoint = "p3"
                                             random_sleep(1, 1)
                                             reserved = False
@@ -619,11 +619,11 @@ for i in range(max_attempt):
                                                 print("Booking attempt: " + str(attempts))
                                                 try:
                                                     if not iAmCandidateClicked:
-                                                        driver.find_element_by_id("i-am-candidate").click()
+                                                        driver.find_element(By.ID, "i-am-candidate").click()
                                                         iAmCandidateClicked = True
                                                     try:
                                                         driver.switch_to.default_content()
-                                                        iframe = driver.find_element_by_id("main-iframe")
+                                                        iframe = driver.find_element(By.ID, "main-iframe")
                                                         driver.switch_to.frame(iframe)
                                                         print("Booking fail - attempting captcha")
                                                         reserved = False
@@ -654,7 +654,7 @@ for i in range(max_attempt):
                                                         print("Failed recaptcha")
                                                     if not testTaken:
                                                         try:
-                                                            iframe = driver.find_element_by_id("main-iframe")
+                                                            iframe = driver.find_element(By.ID, "main-iframe")
                                                             driver.switch_to.frame(iframe)
                                                         except:
                                                             print("No captcha iframe")
@@ -731,7 +731,7 @@ for i in range(max_attempt):
                                                 # except Exception as e:
                                                 #     print(f"Could not send SMS after test accept due to: {e}")
 
-                                                driver.find_element_by_id("confirm-changes").click()
+                                                driver.find_element(By.ID, "confirm-changes").click()
                                                 if ("Request unsuccessful. Incapsula incident ID" in driver.page_source):
                                                     print("Firewall - booking error")
                                                     random_sleep(40, 4)
@@ -814,20 +814,20 @@ for i in range(max_attempt):
 
                             search_centre = licenceInfo["center"][search_centre_id]
 
-                            driver.find_element_by_id("change-test-centre").click()
+                            driver.find_element(By.ID, "change-test-centre").click()
                             moveBack = 1
                             random_sleep(2, 2)
 
-                            driver.find_element_by_id("test-centres-input").clear()
+                            driver.find_element(By.ID, "test-centres-input").clear()
                             input_text_box("test-centres-input", str(search_centre), driver)
 
-                            driver.find_element_by_id("test-centres-submit").click()
+                            driver.find_element(By.ID, "test-centres-submit").click()
                             moveBack = 2
                             random_sleep(5, 2)
 
-                            results_container = driver.find_element_by_class_name("test-centre-results")
+                            results_container = driver.find_element(By.CLASS_NAME, "test-centre-results")
 
-                            test_center = results_container.find_element_by_xpath(".//a")
+                            test_center = results_container.find_element(By.XPATH, ".//a")
 
                             test_center.click()
                             moveBack = 3
@@ -892,25 +892,25 @@ for i in range(max_attempt):
                             if found:
                                 month = datetime.strptime(last_date, "%Y-%m-%d")
                                 attempts = 0
-                                while month.strftime("%B") != driver.find_element_by_class_name("BookingCalendar-currentMonth").get_attribute('innerHTML') and attempts < 12:
+                                while month.strftime("%B") != driver.find_element(By.CLASS_NAME, "BookingCalendar-currentMonth").get_attribute('innerHTML') and attempts < 12:
                                     try:
-                                        driver.find_element_by_class_name("BookingCalendar-nav--prev").click()
+                                        driver.find_element(By.CLASS_NAME, "BookingCalendar-nav--prev").click()
                                     except:
                                         print("Booking rev fail")
                                     attempts += 1
                                     random_sleep(0.1, 0.2)
                                 print(last_date)
                                 print("TARGET CAL MONTH: " + month.strftime("%B"))
-                                print("CURRENT CAL MONTH: " + driver.find_element_by_class_name("BookingCalendar-currentMonth").get_attribute('innerHTML'))
+                                print("CURRENT CAL MONTH: " + driver.find_element(By.CLASS_NAME, "BookingCalendar-currentMonth").get_attribute('innerHTML'))
                                 print("REVERSE NUM: " + str(attempts))
                                 # time.sleep(0.6)
                                 last_date_element.click()
-                                time_container = driver.find_element_by_id("date-" + last_date)
-                                time_item = int(time_container.find_element-by_xpath(".//label").get_attribute('for').replace("slot-", "")) / 1000
+                                time_container = driver.find_element(By.ID, "date-" + last_date)
+                                time_item = int(time_container.find_element(By.XPATH, ".//label").get_attribute('for').replace("slot-", "")) / 1000
                                 test_time = datetime.fromtimestamp(time_item).strftime("%H:%M")
 
                                 try:
-                                    shortNoticeCheck = time_container.find_element_by_id(time_container.find_element_by_xpath(".//label").get_attribute('for')).get_attribute('data-short-notice')
+                                    shortNoticeCheck = time_container.find_element(By.ID, time_container.find_element(By.XPATH, ".//label").get_attribute('for')).get_attribute('data-short-notice')
                                     if shortNoticeCheck == "true":
                                         shortNotice = True
                                         print("Short notice")
@@ -921,7 +921,7 @@ for i in range(max_attempt):
 
                                 print("Test Found: " + last_date + " at " + test_time)
 
-                                time_container.find_element_by_xpath(".//label").click()
+                                time_container.find_element(By.XPATH, ".//label").click()
 
                                 booking_failed = False
                                 errorPoint = "p0"
@@ -931,13 +931,13 @@ for i in range(max_attempt):
                                     time_container.click()
                                     errorPoint = "p1"
                                     time.sleep(0.1)
-                                    driver.find_element_by_id("slot-chosen-submit").click()
+                                    driver.find_element(By.ID, "slot-chosen-submit").click()
                                     errorPoint = "p2"
                                     time.sleep(0.4)
                                     if shortNotice:
-                                        driver.find_element_by_xpath("(//button[@id='slot-warning-continue'])[2]").click()
+                                        driver.find_element(By.XPATH, "(//button[@id='slot-warning-continue'])[2]").click()
                                     else:
-                                        driver.find_element_by_id("slot-warning-continue").click()
+                                        driver.find_element(By.ID, "slot-warning-continue").click()
                                     errorPoint = "p3"
                                     random_sleep(1, 1)
                                     reserved = False
@@ -948,11 +948,11 @@ for i in range(max_attempt):
                                         print("Booking attempt: " + str(attempts))
                                         try:
                                             if not iAmCandidateClicked:
-                                                driver.find_element_by_id("i-am-candidate").click()
+                                                driver.find_element(By.ID, "i-am-candidate").click()
                                                 iAmCandidateClicked = True
                                             try:
                                                 driver.switch_to.default_content()
-                                                iframe = driver.find_element_by_id("main-iframe")
+                                                iframe = driver.find_element(By.ID, "main-iframe")
                                                 driver.switch_to.frame(iframe)
                                                 print("Booking fail - attempting captcha")
                                                 reserved = False
@@ -983,7 +983,7 @@ for i in range(max_attempt):
                                                 print("Failed recaptcha")
                                             if not testTaken:
                                                 try:
-                                                    iframe = driver.find_element_by_id("main-iframe")
+                                                    iframe = driver.find_element(By.ID, "main-iframe")
                                                     driver.switch_to.frame(iframe)
                                                 except:
                                                     print("No captcha iframe")
@@ -1059,7 +1059,7 @@ for i in range(max_attempt):
                                         # except Exception as e:
                                         #     print(f"Could not send SMS after test accept due to: {e}")
 
-                                        driver.find_element_by_id("confirm-changes").click()
+                                        driver.find_element(By.ID, "confirm-changes").click()
                                         if ("Request unsuccessful. Incapsula incident ID" in driver.page_source):
                                             print("Firewall - booking error")
                                             random_sleep(40, 4)

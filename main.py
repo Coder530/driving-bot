@@ -8,6 +8,8 @@ from datetime import datetime, timedelta
 from datetime import time as time1
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from configparser import ConfigParser
 import requests
 import ast
@@ -147,7 +149,9 @@ def is_time_between(begin_time, end_time, check_time=None):
         return check_time >= begin_time or check_time <= end_time
 
 def input_text_box(box_id, text, currentDriver):
-    box = currentDriver.find_element(By.ID, box_id)
+    box = WebDriverWait(currentDriver, 10).until(
+        EC.presence_of_element_located((By.ID, box_id))
+    )
     for charachter in text:
         box.send_keys(charachter)
         time.sleep(random.randint(1, 5) / 100)
@@ -263,8 +267,10 @@ def enter_credentials(manual=False):
     if not manual:
         input_text_box("driving-licence-number", str(licenceInfo["licence"]), driver)
         input_text_box("application-reference-number", str(licenceInfo["booking"]), driver)
-        random_sleep(1, 1)
-        driver.find_element(By.ID, "booking-login").click()
+        login_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.ID, "booking-login"))
+        )
+        login_button.click()
         random_sleep(3, 1)
     else:
         print(f"Enter credentials manually...")

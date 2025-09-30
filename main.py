@@ -100,7 +100,7 @@ def enter_credentials(driver, licenceInfo):
     input_text_box("driving-licence-number", str(licenceInfo["licence"]), driver)
     input_text_box("application-reference-number", str(licenceInfo["booking"]), driver)
     WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "booking-login"))).click()
-    time.sleep(random.uniform(1.5, 2.5))
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "test-centre-change")))
 
 def scan_for_preferred_tests(before_date, after_date, unavailable_dates, test_date, formatted_test_date, currentDriver):
     if before_date:
@@ -130,7 +130,6 @@ def launch_driver(licence_id):
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     chrome_options.add_argument("--window-size=1920,1080")
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-    chrome_options.add_argument("--disable-infobars")
 
     chrome_options.add_experimental_option("prefs", {"profile.managed_default_content_settings.images": 2})
 
@@ -182,6 +181,7 @@ def main():
                     driver.get(dvsa_queue_url)
                     WebDriverWait(driver, 300).until_not(EC.url_contains("queue.driverpracticaltest.dvsa.gov.uk"))
                     print("Queue complete!")
+                    WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.ID, "driving-licence-number"))) # Wait for login page to load
 
                     # Handle Incapsula/Imperva bot detection
                     for i in range(3): # Try up to 3 times
@@ -205,17 +205,15 @@ def main():
                 # Navigate to the test change page
                 if "find-test-centre" not in driver.current_url:
                     WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.ID, "test-centre-change"))).click()
-                    time.sleep(random.uniform(0.8, 1.5))
 
                 WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.ID, "test-centres-input"))).clear()
                 input_text_box("test-centres-input", str(licenceInfo["center"][0]), driver)
                 WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.ID, "test-centres-submit"))).click()
-                time.sleep(random.uniform(0.8, 1.5))
 
                 results_container = WebDriverWait(driver,10).until(EC.presence_of_element_located((By.CLASS_NAME, "test-centre-results")))
                 test_center = results_container.find_element(By.XPATH, ".//a")
                 test_center.click()
-                time.sleep(random.uniform(0.8, 1.5))
+                WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "BookingCalendar-datesBody")))
 
                 if "There are no tests available" in driver.page_source:
                     print("No tests available at this time.")

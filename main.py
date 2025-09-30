@@ -77,6 +77,7 @@ def input_text_box(box_id, text, currentDriver):
     for character in text:
         box.send_keys(character)
         time.sleep(random.randint(1, 5) / 100)
+    time.sleep(random.uniform(0.1, 0.4))
 
 def random_sleep(weight, max_time):
     print(f"Sleeping for {weight} seconds...")
@@ -99,7 +100,7 @@ def enter_credentials(driver, licenceInfo):
     input_text_box("driving-licence-number", str(licenceInfo["licence"]), driver)
     input_text_box("application-reference-number", str(licenceInfo["booking"]), driver)
     WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "booking-login"))).click()
-    random_sleep(3, 1)
+    time.sleep(random.uniform(1.5, 2.5))
 
 def scan_for_preferred_tests(before_date, after_date, unavailable_dates, test_date, formatted_test_date, currentDriver):
     if before_date:
@@ -121,6 +122,32 @@ def scan_for_preferred_tests(before_date, after_date, unavailable_dates, test_da
         if data_date_str not in unavailable_dates and data_date < minDate and data_date > maxDate and data_date.weekday() < 5 and data_date_str != formatted_test_date:
             return True, data_date_str, day_a
     return False, None, None
+
+
+def launch_driver(licence_id):
+    print(f"Relaunching driver for licence {licence_id}")
+    chrome_options = uc.ChromeOptions()
+    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+    chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+    chrome_options.add_argument("--disable-infobars")
+
+    chrome_options.add_experimental_option("prefs", {"profile.managed_default_content_settings.images": 2})
+
+    use_buster = config.getboolean("preferences", "use_buster", fallback=True)
+    if use_buster and busterEnabled and os.path.exists(busterPath):
+        print("Buster extension enabled.")
+        chrome_options.add_extension(busterPath)
+
+    user_data_dir = os.path.join(current_path, "chrome_profile")
+    if not os.path.exists(user_data_dir):
+        os.makedirs(user_data_dir)
+    chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
+
+    driver = uc.Chrome(options=chrome_options, use_subprocess=True)
+    time.sleep(random.randint(2, 4))
+    return driver
+
 
 def main():
     print(f"Time: {datetime.now()}")
@@ -148,18 +175,7 @@ def main():
 
             try:
                 if not driver:
-                    print(f"Relaunching driver for licence {licenceInfo['licence-id']}")
-                    chrome_options = uc.ChromeOptions()
-                    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-                    chrome_options.add_argument("--window-size=1920,1080")
-                    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-
-                    chrome_options.add_experimental_option("prefs", {"profile.managed_default_content_settings.images": 2})
-                    if busterEnabled and os.path.exists(busterPath):
-                        chrome_options.add_extension(busterPath)
-
-                    driver = uc.Chrome(options=chrome_options, use_subprocess=True)
-                    time.sleep(random.randint(2, 4))
+                    driver = launch_driver(licenceInfo['licence-id'])
                     activeDrivers[licenceInfo['licence-id']] = driver
 
                     print("Launching queue...")
@@ -167,10 +183,15 @@ def main():
                     WebDriverWait(driver, 300).until_not(EC.url_contains("queue.driverpracticaltest.dvsa.gov.uk"))
                     print("Queue complete!")
 
-                    if "Request unsuccessful. Incapsula incident ID" in driver.page_source:
-                        print("Firewall detected. Attempting to solve captcha...")
-                        captcha_solver = CaptchaSolver(driver)
-                        captcha_solver.solve_captcha()
+                    # Handle Incapsula/Imperva bot detection
+                    for i in range(3): # Try up to 3 times
+                        if "Pardon Our Interruption" in driver.page_source or "Request unsuccessful. Incapsula incident ID" in driver.page_source:
+                            print(f"Firewall detected. Waiting and re-navigating (attempt {i+1}/3)...")
+                            time.sleep(random.uniform(15, 25))
+                            driver.get(dvsa_queue_url)
+                            WebDriverWait(driver, 300).until_not(EC.url_contains("queue.driverpracticaltest.dvsa.gov.uk"))
+                        else:
+                            break # Exit loop if the page is clear
 
                     enter_credentials(driver, licenceInfo)
 
@@ -184,14 +205,17 @@ def main():
                 # Navigate to the test change page
                 if "find-test-centre" not in driver.current_url:
                     WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.ID, "test-centre-change"))).click()
+                    time.sleep(random.uniform(0.8, 1.5))
 
                 WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.ID, "test-centres-input"))).clear()
                 input_text_box("test-centres-input", str(licenceInfo["center"][0]), driver)
                 WebDriverWait(driver,10).until(EC.element_to_be_clickable((By.ID, "test-centres-submit"))).click()
+                time.sleep(random.uniform(0.8, 1.5))
 
                 results_container = WebDriverWait(driver,10).until(EC.presence_of_element_located((By.CLASS_NAME, "test-centre-results")))
                 test_center = results_container.find_element(By.XPATH, ".//a")
                 test_center.click()
+                time.sleep(random.uniform(0.8, 1.5))
 
                 if "There are no tests available" in driver.page_source:
                     print("No tests available at this time.")

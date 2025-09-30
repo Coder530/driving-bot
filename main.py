@@ -133,7 +133,6 @@ def launch_driver(licence_id):
     chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36')
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     chrome_options.add_argument("--start-maximized")
-    chrome_options.add_experimental_option("useAutomationExtension", False)
 
     # Re-instate the persistent user profile, a key feature for stability.
     user_data_dir = os.path.join(current_path, "chrome_profile")

@@ -150,11 +150,16 @@ def main():
                 if not driver:
                     print(f"Relaunching driver for licence {licenceInfo['licence-id']}")
                     chrome_options = uc.ChromeOptions()
+                    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+                    chrome_options.add_argument("--window-size=1920,1080")
+                    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+
                     chrome_options.add_experimental_option("prefs", {"profile.managed_default_content_settings.images": 2})
                     if busterEnabled and os.path.exists(busterPath):
                         chrome_options.add_extension(busterPath)
 
                     driver = uc.Chrome(options=chrome_options, use_subprocess=True)
+                    time.sleep(random.randint(2, 4))
                     activeDrivers[licenceInfo['licence-id']] = driver
 
                     print("Launching queue...")

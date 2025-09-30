@@ -127,10 +127,8 @@ def scan_for_preferred_tests(before_date, after_date, unavailable_dates, test_da
 def launch_driver(licence_id):
     print(f"Relaunching driver for licence {licence_id}")
     chrome_options = uc.ChromeOptions()
-    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-    chrome_options.add_argument("--window-size=1920,1080")
-    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-
+    # Let undetected_chromedriver handle the stealth options.
+    # We will only configure the user profile and image loading.
     chrome_options.add_experimental_option("prefs", {"profile.managed_default_content_settings.images": 2})
 
     use_buster = config.getboolean("preferences", "use_buster", fallback=True)
@@ -143,7 +141,8 @@ def launch_driver(licence_id):
         os.makedirs(user_data_dir)
     chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
 
-    driver = uc.Chrome(options=chrome_options, use_subprocess=True)
+    use_headless = config.getboolean("preferences", "use_headless", fallback=False)
+    driver = uc.Chrome(options=chrome_options, use_subprocess=True, headless=use_headless, version_main=126)
     time.sleep(random.randint(2, 4))
     return driver
 
@@ -176,6 +175,10 @@ def main():
                 if not driver:
                     driver = launch_driver(licenceInfo['licence-id'])
                     activeDrivers[licenceInfo['licence-id']] = driver
+
+                    print("Warming up browser...")
+                    driver.get("https://www.google.com/")
+                    time.sleep(random.uniform(2, 5))
 
                     print("Launching queue...")
                     driver.get(dvsa_queue_url)

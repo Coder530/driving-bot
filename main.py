@@ -21,6 +21,14 @@ import random
 import shutil
 from captcha_solver import CaptchaSolver
 
+
+USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.1 Safari/605.1.15',
+]
+
 # ==================================================================================================
 #  Please update details in config.ini
 # ==================================================================================================
@@ -129,10 +137,11 @@ def launch_driver(licence_id):
     print(f"Relaunching driver for licence {licence_id}")
     chrome_options = uc.ChromeOptions()
 
-    # Update User-Agent to a more modern one and add options to evade detection.
-    chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36')
+    # Rotate User-Agent and add options to evade detection.
+    chrome_options.add_argument(f'--user-agent={random.choice(USER_AGENTS)}')
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     chrome_options.add_argument("--start-maximized")
+    chrome_options.add_argument('--no-proxy-server')
 
     # Re-instate the persistent user profile, a key feature for stability.
     user_data_dir = os.path.join(current_path, "chrome_profile")

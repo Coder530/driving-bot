@@ -18,6 +18,7 @@ import json
 import os
 import traceback
 import random
+from captcha_solver import CaptchaSolver
 
 # ==================================================================================================
 #  Please update details in config.ini
@@ -94,30 +95,6 @@ def wait_for_internet_connection():
             print("No internet connection. Retrying in 5 seconds...")
             time.sleep(5)
 
-def solve_captcha(currentDriver, skip=False) -> bool:
-    if skip:
-        print("Captcha solving skipped by config. Please solve manually...")
-        time.sleep(60)
-        return True
-    try:
-        driver = currentDriver
-        driver.switch_to.default_content()
-        WebDriverWait(driver, 10).until(EC.frame_to_be_available_and_switch_to_it((By.ID, "main-iframe")))
-        WebDriverWait(driver, 10).until(EC.frame_to_be_available_and_switch_to_it((By.CSS_SELECTOR, "iframe[name*='a-'][src*='recaptcha']")))
-        WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "recaptcha-anchor"))).click()
-        driver.switch_to.default_content()
-        # Check if captcha was solved by the click or if a challenge is presented
-        time.sleep(2) # Wait a moment for challenge to appear
-        WebDriverWait(driver, 5).until(EC.frame_to_be_available_and_switch_to_it((By.ID, "main-iframe")))
-        if "Why am I seeing this page" in driver.page_source:
-             raise Exception("Automated captcha solve failed.")
-        print("Captcha solved automatically.")
-        return True
-    except Exception as e:
-        print(f"Automatic captcha solving failed: {e}. Please solve manually. You have 60 seconds.")
-        time.sleep(60) # Give user time to solve
-        return True
-
 def enter_credentials(driver, licenceInfo):
     input_text_box("driving-licence-number", str(licenceInfo["licence"]), driver)
     input_text_box("application-reference-number", str(licenceInfo["booking"]), driver)
@@ -187,7 +164,8 @@ def main():
 
                     if "Request unsuccessful. Incapsula incident ID" in driver.page_source:
                         print("Firewall detected. Attempting to solve captcha...")
-                        solve_captcha(driver)
+                        captcha_solver = CaptchaSolver(driver)
+                        captcha_solver.solve_captcha()
 
                     enter_credentials(driver, licenceInfo)
 

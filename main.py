@@ -18,6 +18,7 @@ import json
 import os
 import traceback
 import random
+import shutil
 from captcha_solver import CaptchaSolver
 
 # ==================================================================================================
@@ -127,22 +128,24 @@ def scan_for_preferred_tests(before_date, after_date, unavailable_dates, test_da
 def launch_driver(licence_id):
     print(f"Relaunching driver for licence {licence_id}")
     chrome_options = uc.ChromeOptions()
-    # Let undetected_chromedriver handle the stealth options.
-    # We will only configure the user profile and image loading.
-    chrome_options.add_experimental_option("prefs", {"profile.managed_default_content_settings.images": 2})
 
-    use_buster = config.getboolean("preferences", "use_buster", fallback=True)
-    if use_buster and busterEnabled and os.path.exists(busterPath):
-        print("Buster extension enabled.")
-        chrome_options.add_extension(busterPath)
+    # Add a standard User-Agent to avoid appearing as a headless or unusual browser.
+    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 
+    # Re-instate the persistent user profile, a key feature for stability.
     user_data_dir = os.path.join(current_path, "chrome_profile")
     if not os.path.exists(user_data_dir):
         os.makedirs(user_data_dir)
     chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
 
+    # Conditionally load the Buster extension for automated captcha solving.
+    use_buster = config.getboolean("preferences", "use_buster", fallback=False)
+    if use_buster and busterEnabled and os.path.exists(busterPath):
+        print("Buster extension enabled.")
+        chrome_options.add_extension(busterPath)
+
     use_headless = config.getboolean("preferences", "use_headless", fallback=False)
-    driver = uc.Chrome(options=chrome_options, use_subprocess=True, headless=use_headless, version_main=126)
+    driver = uc.Chrome(options=chrome_options, use_subprocess=True, headless=use_headless)
     time.sleep(random.randint(2, 4))
     return driver
 
@@ -186,15 +189,27 @@ def main():
                     print("Queue complete!")
                     WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.ID, "driving-licence-number"))) # Wait for login page to load
 
-                    # Handle Incapsula/Imperva bot detection
-                    for i in range(3): # Try up to 3 times
+                    # Handle Incapsula/Imperva bot detection and potential CAPTCHAs
+                    if "Pardon Our Interruption" in driver.page_source or "Request unsuccessful. Incapsula incident ID" in driver.page_source:
+                        print("Firewall detected. Attempting multi-layered recovery...")
+
+                        # Layer 1: Try a patient re-navigation first.
+                        print("Recovery Layer 1: Attempting patient re-navigation...")
+                        driver.get(dvsa_queue_url)
+                        WebDriverWait(driver, 300).until_not(EC.url_contains("queue.driverpracticaltest.dvsa.gov.uk"))
+                        WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.ID, "driving-licence-number")))
+                        time.sleep(2) # Allow page to settle.
+
+                        # Layer 2 & 3: If still blocked, attempt CAPTCHA solve (automated or manual).
                         if "Pardon Our Interruption" in driver.page_source or "Request unsuccessful. Incapsula incident ID" in driver.page_source:
-                            print(f"Firewall detected. Waiting and re-navigating (attempt {i+1}/3)...")
-                            time.sleep(random.uniform(15, 25))
-                            driver.get(dvsa_queue_url)
-                            WebDriverWait(driver, 300).until_not(EC.url_contains("queue.driverpracticaltest.dvsa.gov.uk"))
-                        else:
-                            break # Exit loop if the page is clear
+                            print("Recovery Layer 1 failed. Proceeding to Layer 2/3: CAPTCHA Handling.")
+                            use_buster = config.getboolean("preferences", "use_buster", fallback=False)
+                            captcha_solver = CaptchaSolver(driver)
+                            captcha_solver.solve_captcha(skip=not use_buster)
+
+                    # Final check after all recovery attempts.
+                    if "Pardon Our Interruption" in driver.page_source or "Request unsuccessful. Incapsula incident ID" in driver.page_source:
+                        raise WebDriverException("Failed to bypass firewall after all recovery attempts.")
 
                     enter_credentials(driver, licenceInfo)
 
@@ -258,6 +273,16 @@ def main():
                         activeDrivers[licenceInfo['licence-id']].quit()
                     except: pass
                     del activeDrivers[licenceInfo['licence-id']]
+
+                # "Scorched Earth" recovery: Delete the compromised profile directory.
+                user_data_dir = os.path.join(current_path, "chrome_profile")
+                if os.path.exists(user_data_dir):
+                    try:
+                        print(f"Deleting compromised profile directory: {user_data_dir}")
+                        shutil.rmtree(user_data_dir)
+                    except OSError as e_shutil:
+                        print(f"Error deleting profile directory {user_data_dir}: {e_shutil.strerror}")
+
                 print("Driver closed. Will restart in the next loop.")
 
             except Exception as e:

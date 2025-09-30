@@ -129,8 +129,12 @@ def launch_driver(licence_id):
     print(f"Relaunching driver for licence {licence_id}")
     chrome_options = uc.ChromeOptions()
 
-    # Add a standard User-Agent to avoid appearing as a headless or unusual browser.
-    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+    # Update User-Agent to a more modern one and add options to evade detection.
+    chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36')
+    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+    chrome_options.add_argument("--start-maximized")
+    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    chrome_options.add_experimental_option('useAutomationExtension', False)
 
     # Re-instate the persistent user profile, a key feature for stability.
     user_data_dir = os.path.join(current_path, "chrome_profile")
@@ -146,6 +150,10 @@ def launch_driver(licence_id):
 
     use_headless = config.getboolean("preferences", "use_headless", fallback=False)
     driver = uc.Chrome(options=chrome_options, use_subprocess=True, headless=use_headless)
+
+    # Add a script to the browser to ensure the webdriver flag is set to false.
+    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+
     time.sleep(random.randint(2, 4))
     return driver
 

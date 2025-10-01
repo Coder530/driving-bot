@@ -20,6 +20,7 @@ import traceback
 import random
 import shutil
 import re
+import subprocess
 from sys import platform
 from captcha_solver import CaptchaSolver
 
@@ -50,7 +51,7 @@ def get_chrome_major_version():
                 paths = [f.path for f in os.scandir(path) if f.is_dir()]
                 for path in paths:
                     filename = os.path.basename(path)
-                    pattern = '\d+\.\d+\.\d+\.\d+'
+                    pattern = r'\d+\.\d+\.\d+\.\d+'
                     match = re.search(pattern, filename)
                     if match and match.group():
                         # Found a Chrome version.
@@ -60,7 +61,12 @@ def get_chrome_major_version():
     version = None
     install_path = None
 
+    original_cwd = os.getcwd()
+    temp_dir = os.path.expanduser("~")
+
     try:
+        os.chdir(temp_dir) # Change to a safe directory
+
         if platform == "linux" or platform == "linux2":
             # linux
             for executable in ["google-chrome", "chromium-browser", "chromium"]:
@@ -87,6 +93,8 @@ def get_chrome_major_version():
                 version = extract_version_folder()
     except Exception as ex:
         print(f"Error detecting Chrome version: {ex}")
+    finally:
+        os.chdir(original_cwd) # Change back to the original directory
 
     if version:
         return int(version.split('.')[0])
@@ -230,7 +238,15 @@ def launch_driver(licence_id):
 
     use_headless = config.getboolean("preferences", "use_headless", fallback=False)
     chrome_version = get_chrome_major_version()
-    driver = uc.Chrome(options=chrome_options, use_subprocess=True, headless=use_headless, version_main=chrome_version)
+
+    original_cwd = os.getcwd()
+    temp_dir = os.path.expanduser("~")
+
+    try:
+        os.chdir(temp_dir)
+        driver = uc.Chrome(options=chrome_options, use_subprocess=True, headless=use_headless, version_main=chrome_version)
+    finally:
+        os.chdir(original_cwd)
 
     # Add a script to the browser to ensure the webdriver flag is set to false.
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
@@ -366,15 +382,22 @@ def main():
                 # "Scorched Earth" recovery: Delete the compromised profile directory.
                 user_data_dir = os.path.join(current_path, "chrome_profile")
                 if os.path.exists(user_data_dir):
+                    original_cwd = os.getcwd()
+                    temp_dir = os.path.expanduser("~")
                     try:
+                        os.chdir(temp_dir)
                         if platform == "win32":
                             # Attempt to gracefully close any lingering Chrome processes on Windows
-                            os.system("taskkill /f /im chrome.exe")
+                            subprocess.run(["taskkill", "/f", "/im", "chrome.exe"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                             time.sleep(2)  # Give processes time to terminate
+
                         print(f"Deleting compromised profile directory: {user_data_dir}")
+                        # shutil.rmtree might fail on UNC paths, so we ensure it's not the CWD
                         shutil.rmtree(user_data_dir)
                     except OSError as e_shutil:
                         print(f"Error deleting profile directory {user_data_dir}: {e_shutil}")
+                    finally:
+                        os.chdir(original_cwd)
 
                 print("Driver closed. Will restart in the next loop.")
 

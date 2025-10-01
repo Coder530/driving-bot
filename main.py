@@ -104,10 +104,12 @@ def get_chrome_major_version():
 
 
 USER_AGENTS = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.1 Safari/605.1.15',
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
 ]
 
 # ==================================================================================================
@@ -237,6 +239,12 @@ def launch_driver(licence_id):
         chrome_options.add_extension(busterPath)
 
     use_headless = config.getboolean("preferences", "use_headless", fallback=False)
+    if use_headless:
+        print("\n" + "="*100)
+        print("WARNING: Headless mode is enabled. This significantly increases the risk of bot detection.")
+        print("It is strongly recommended to set 'use_headless = False' in config.ini for better results.")
+        print("="*100 + "\n")
+
     chrome_version = get_chrome_major_version()
 
     original_cwd = os.getcwd()
@@ -260,6 +268,25 @@ def main():
     print("="*100)
     print("START OF SCRIPT")
     print("="*100)
+
+    # Force a clean slate by deleting the profile directory on every run.
+    # This helps bypass bot detection and clear potential "Error 15" issues.
+    user_data_dir = os.path.join(current_path, "chrome_profile")
+    if os.path.exists(user_data_dir):
+        print(f"Clearing browser profile for a clean start: {user_data_dir}")
+        original_cwd = os.getcwd()
+        temp_dir = os.path.expanduser("~")
+        try:
+            os.chdir(temp_dir)
+            if platform == "win32":
+                # First, ensure no chrome processes are locking the directory
+                subprocess.run(["taskkill", "/f", "/im", "chrome.exe"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                time.sleep(2)
+            shutil.rmtree(user_data_dir)
+        except OSError as e:
+            print(f"Could not delete profile directory {user_data_dir}: {e}. This might affect bot detection evasion.")
+        finally:
+            os.chdir(original_cwd)
 
     wait_for_internet_connection()
 

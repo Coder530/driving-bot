@@ -19,7 +19,80 @@ import os
 import traceback
 import random
 import shutil
+import re
+from sys import platform
 from captcha_solver import CaptchaSolver
+
+
+def get_chrome_major_version():
+    """
+    Programmatically detects the major version of the Chrome web browser installed on the PC.
+    Compatible with Windows, Mac, and Linux.
+    """
+
+    def extract_version_registry(output):
+        try:
+            google_version = ''
+            for letter in output[output.rindex('DisplayVersion    REG_SZ') + 24:]:
+                if letter != '\n':
+                    google_version += letter
+                else:
+                    break
+            return google_version.strip()
+        except TypeError:
+            return
+
+    def extract_version_folder():
+        # Check if the Chrome folder exists in the x32 or x64 Program Files folders.
+        for i in range(2):
+            path = 'C:\\Program Files' + (' (x86)' if i else '') + '\\Google\\Chrome\\Application'
+            if os.path.isdir(path):
+                paths = [f.path for f in os.scandir(path) if f.is_dir()]
+                for path in paths:
+                    filename = os.path.basename(path)
+                    pattern = '\d+\.\d+\.\d+\.\d+'
+                    match = re.search(pattern, filename)
+                    if match and match.group():
+                        # Found a Chrome version.
+                        return match.group(0)
+        return None
+
+    version = None
+    install_path = None
+
+    try:
+        if platform == "linux" or platform == "linux2":
+            # linux
+            for executable in ["google-chrome", "chromium-browser", "chromium"]:
+                try:
+                    with os.popen(f"{executable} --version") as stream:
+                        version = stream.read().strip().split(" ")[-1]
+                        break
+                except FileNotFoundError:
+                    continue
+        elif platform == "darwin":
+            # OS X
+            install_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+            with os.popen(f'"{install_path}" --version') as stream:
+                version = stream.read().strip().replace("Google Chrome ", "")
+        elif platform == "win32":
+            # Windows...
+            try:
+                # Try registry key.
+                stream = os.popen('reg query "HKLM\\SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Google Chrome"')
+                output = stream.read()
+                version = extract_version_registry(output)
+            except Exception:
+                # Try folder path.
+                version = extract_version_folder()
+    except Exception as ex:
+        print(f"Error detecting Chrome version: {ex}")
+
+    if version:
+        return int(version.split('.')[0])
+
+    print("Could not detect Chrome version. Please ensure Chrome is installed.")
+    return None
 
 
 USER_AGENTS = [
@@ -156,7 +229,8 @@ def launch_driver(licence_id):
         chrome_options.add_extension(busterPath)
 
     use_headless = config.getboolean("preferences", "use_headless", fallback=False)
-    driver = uc.Chrome(options=chrome_options, use_subprocess=True, headless=use_headless)
+    chrome_version = get_chrome_major_version()
+    driver = uc.Chrome(options=chrome_options, use_subprocess=True, headless=use_headless, version_main=chrome_version)
 
     # Add a script to the browser to ensure the webdriver flag is set to false.
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
@@ -293,10 +367,14 @@ def main():
                 user_data_dir = os.path.join(current_path, "chrome_profile")
                 if os.path.exists(user_data_dir):
                     try:
+                        if platform == "win32":
+                            # Attempt to gracefully close any lingering Chrome processes on Windows
+                            os.system("taskkill /f /im chrome.exe")
+                            time.sleep(2)  # Give processes time to terminate
                         print(f"Deleting compromised profile directory: {user_data_dir}")
                         shutil.rmtree(user_data_dir)
                     except OSError as e_shutil:
-                        print(f"Error deleting profile directory {user_data_dir}: {e_shutil.strerror}")
+                        print(f"Error deleting profile directory {user_data_dir}: {e_shutil}")
 
                 print("Driver closed. Will restart in the next loop.")
 

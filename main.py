@@ -135,7 +135,13 @@ def parse_config() -> dict:
             "disabled-dates": ast.literal_eval(kwargs.get('disabled_dates', '[]')),
             "center": ast.literal_eval(kwargs.get('centre', '[]')),
             "before-date": kwargs.get('before_date'),
-            "after-date": kwargs.get('after_date')
+            "after-date": kwargs.get('after_date'),
+            "proxy": {
+                "host": kwargs.get('host'),
+                "port": kwargs.get('port'),
+                "username": kwargs.get('username'),
+                "password": kwargs.get('password'),
+            }
         }
         return preference
 
@@ -216,7 +222,9 @@ def scan_for_preferred_tests(before_date, after_date, unavailable_dates, test_da
     return False, None, None
 
 
-def launch_driver(licence_id):
+def launch_driver(licenceInfo):
+    licence_id = licenceInfo['licence-id']
+    proxy_config = licenceInfo.get('proxy', {})
     print(f"Relaunching driver for licence {licence_id}")
     chrome_options = uc.ChromeOptions()
 
@@ -224,7 +232,80 @@ def launch_driver(licence_id):
     chrome_options.add_argument(f'--user-agent={random.choice(USER_AGENTS)}')
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     chrome_options.add_argument("--start-maximized")
-    chrome_options.add_argument('--no-proxy-server')
+
+    # Configure and load proxy via a temporary extension if details are provided
+    proxy_host = proxy_config.get('host')
+    proxy_port = proxy_config.get('port')
+    proxy_user = proxy_config.get('username')
+    proxy_pass = proxy_config.get('password')
+
+    if proxy_host and proxy_port:
+        print(f"Configuring browser to use proxy: {proxy_host}:{proxy_port}")
+
+        manifest_json = """
+        {
+            "version": "1.0.0",
+            "manifest_version": 2,
+            "name": "Chrome Proxy",
+            "permissions": [
+                "proxy",
+                "tabs",
+                "unlimitedStorage",
+                "storage",
+                "<all_urls>",
+                "webRequest",
+                "webRequestBlocking"
+            ],
+            "background": {
+                "scripts": ["background.js"]
+            }
+        }
+        """
+
+        background_js = f'''
+        var config = {{
+            mode: "fixed_servers",
+            rules: {{
+              singleProxy: {{
+                scheme: "http",
+                host: "{proxy_host}",
+                port: parseInt({proxy_port})
+              }},
+              bypassList: ["localhost"]
+            }}
+          }};
+
+        chrome.proxy.settings.set({{value: config, scope: "regular"}}, function() {{}});
+
+        function callbackFn(details) {{
+            return {{
+                authCredentials: {{
+                    username: "{proxy_user}",
+                    password: "{proxy_pass}"
+                }}
+            }};
+        }}
+
+        chrome.webRequest.onAuthRequired.addListener(
+                    callbackFn,
+                    {{urls: ["<all_urls>"]}},
+                    ['blocking']
+        );
+        '''
+
+        proxy_extension_dir = os.path.join(current_path, "proxy_extension")
+        if not os.path.exists(proxy_extension_dir):
+            os.makedirs(proxy_extension_dir)
+
+        with open(os.path.join(proxy_extension_dir, "manifest.json"), "w") as f:
+            f.write(manifest_json)
+
+        with open(os.path.join(proxy_extension_dir, "background.js"), "w") as f:
+            f.write(background_js)
+
+        chrome_options.add_argument(f"--load-extension={proxy_extension_dir}")
+    else:
+        chrome_options.add_argument('--no-proxy-server')
 
     # Re-instate the persistent user profile, a key feature for stability.
     user_data_dir = os.path.join(current_path, "chrome_profile")
@@ -308,7 +389,7 @@ def main():
 
             try:
                 if not driver:
-                    driver = launch_driver(licenceInfo['licence-id'])
+                    driver = launch_driver(licenceInfo)
                     activeDrivers[licenceInfo['licence-id']] = driver
 
                     print("Warming up browser...")
@@ -445,6 +526,16 @@ def main():
     finally:
         print("="*100)
         print("END OF SCRIPT. Cleaning up...")
+
+        # Clean up the proxy extension directory
+        proxy_extension_dir = os.path.join(current_path, "proxy_extension")
+        if os.path.exists(proxy_extension_dir):
+            try:
+                print(f"Cleaning up proxy extension directory: {proxy_extension_dir}")
+                shutil.rmtree(proxy_extension_dir)
+            except OSError as e:
+                print(f"Error cleaning up proxy extension directory {proxy_extension_dir}: {e}")
+
         for driver_id, driver_instance in activeDrivers.items():
             try:
                 driver_instance.quit()

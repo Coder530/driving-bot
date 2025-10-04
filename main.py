@@ -307,11 +307,18 @@ def launch_driver(licenceInfo):
     else:
         chrome_options.add_argument('--no-proxy-server')
 
-    # Re-instate the persistent user profile, a key feature for stability.
-    user_data_dir = os.path.join(current_path, "chrome_profile")
-    if not os.path.exists(user_data_dir):
-        os.makedirs(user_data_dir)
-    chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
+    # Conditionally use incognito mode or a persistent user profile.
+    use_incognito = config.getboolean("preferences", "use_incognito", fallback=False)
+    if use_incognito:
+        print("Using incognito mode for this session.")
+        chrome_options.add_argument('--incognito')
+    else:
+        # Re-instate the persistent user profile for stability.
+        print("Using persistent profile for this session.")
+        user_data_dir = os.path.join(current_path, "chrome_profile")
+        if not os.path.exists(user_data_dir):
+            os.makedirs(user_data_dir)
+        chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
 
     # Conditionally load the Buster extension for automated captcha solving.
     use_buster = config.getboolean("preferences", "use_buster", fallback=False)
@@ -350,24 +357,27 @@ def main():
     print("START OF SCRIPT")
     print("="*100)
 
-    # Force a clean slate by deleting the profile directory on every run.
+    use_incognito = config.getboolean("preferences", "use_incognito", fallback=False)
+
+    # If not in incognito mode, force a clean slate by deleting the profile directory.
     # This helps bypass bot detection and clear potential "Error 15" issues.
-    user_data_dir = os.path.join(current_path, "chrome_profile")
-    if os.path.exists(user_data_dir):
-        print(f"Clearing browser profile for a clean start: {user_data_dir}")
-        original_cwd = os.getcwd()
-        temp_dir = os.path.expanduser("~")
-        try:
-            os.chdir(temp_dir)
-            if platform == "win32":
-                # First, ensure no chrome processes are locking the directory
-                subprocess.run(["taskkill", "/f", "/im", "chrome.exe"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                time.sleep(2)
-            shutil.rmtree(user_data_dir)
-        except OSError as e:
-            print(f"Could not delete profile directory {user_data_dir}: {e}. This might affect bot detection evasion.")
-        finally:
-            os.chdir(original_cwd)
+    if not use_incognito:
+        user_data_dir = os.path.join(current_path, "chrome_profile")
+        if os.path.exists(user_data_dir):
+            print(f"Clearing browser profile for a clean start: {user_data_dir}")
+            original_cwd = os.getcwd()
+            temp_dir = os.path.expanduser("~")
+            try:
+                os.chdir(temp_dir)
+                if platform == "win32":
+                    # First, ensure no chrome processes are locking the directory
+                    subprocess.run(["taskkill", "/f", "/im", "chrome.exe"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    time.sleep(2)
+                shutil.rmtree(user_data_dir)
+            except OSError as e:
+                print(f"Could not delete profile directory {user_data_dir}: {e}. This might affect bot detection evasion.")
+            finally:
+                os.chdir(original_cwd)
 
     wait_for_internet_connection()
 
@@ -487,25 +497,26 @@ def main():
                     except: pass
                     del activeDrivers[licenceInfo['licence-id']]
 
-                # "Scorched Earth" recovery: Delete the compromised profile directory.
-                user_data_dir = os.path.join(current_path, "chrome_profile")
-                if os.path.exists(user_data_dir):
-                    original_cwd = os.getcwd()
-                    temp_dir = os.path.expanduser("~")
-                    try:
-                        os.chdir(temp_dir)
-                        if platform == "win32":
-                            # Attempt to gracefully close any lingering Chrome processes on Windows
-                            subprocess.run(["taskkill", "/f", "/im", "chrome.exe"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                            time.sleep(2)  # Give processes time to terminate
+                # "Scorched Earth" recovery: Delete the compromised profile directory if not in incognito.
+                if not use_incognito:
+                    user_data_dir = os.path.join(current_path, "chrome_profile")
+                    if os.path.exists(user_data_dir):
+                        original_cwd = os.getcwd()
+                        temp_dir = os.path.expanduser("~")
+                        try:
+                            os.chdir(temp_dir)
+                            if platform == "win32":
+                                # Attempt to gracefully close any lingering Chrome processes on Windows
+                                subprocess.run(["taskkill", "/f", "/im", "chrome.exe"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                time.sleep(2)  # Give processes time to terminate
 
-                        print(f"Deleting compromised profile directory: {user_data_dir}")
-                        # shutil.rmtree might fail on UNC paths, so we ensure it's not the CWD
-                        shutil.rmtree(user_data_dir)
-                    except OSError as e_shutil:
-                        print(f"Error deleting profile directory {user_data_dir}: {e_shutil}")
-                    finally:
-                        os.chdir(original_cwd)
+                            print(f"Deleting compromised profile directory: {user_data_dir}")
+                            # shutil.rmtree might fail on UNC paths, so we ensure it's not the CWD
+                            shutil.rmtree(user_data_dir)
+                        except OSError as e_shutil:
+                            print(f"Error deleting profile directory {user_data_dir}: {e_shutil}")
+                        finally:
+                            os.chdir(original_cwd)
 
                 print("Driver closed. Will restart in the next loop.")
 
